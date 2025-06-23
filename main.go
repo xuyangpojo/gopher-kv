@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"gopherkv/collection"
 	"os"
 	"strings"
 )
@@ -11,8 +10,18 @@ import (
 func main() {
 	store := make(map[string]collection.MyString)
 	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Println("欢迎使用 GopherKV 键值型内存数据库!")
-	fmt.Println("")
+	fmt.Println("--------------------------------------------------")
+	fmt.Println("   _____             _                 _  ____      __")
+	fmt.Println("  / ____|           | |               | |/ /\\ \\    / /")
+	fmt.Println(" | |  __  ___  _ __ | |__   ___ _ __  | ' /  \\ \\  / / ")
+	fmt.Println(" | | |_ |/ _ \\| '_ \\| '_ \\ / _ \\ '__| |  <    \\ \\/ /  ")
+	fmt.Println(" | |__| | (_) | |_) | | | |  __/ |    | . \\    \\  /   ")
+	fmt.Println("  \\_____|\\___/| .__/|_| |_|\\___|_|    |_|\\_\\    \\/    ")
+	fmt.Println("              | |                                     ")
+	fmt.Println("              |_|                                     ")
+	fmt.Println("欢迎使用 GopherKV 键值型内存数据库! :)")
+	fmt.Println("访问 https://github.com/xuyangpojo/gopher-kv 以获取帮助")
+	fmt.Println("--------------------------------------------------")
 	for {
 		fmt.Print("gopherKV> ")
 		if !scanner.Scan() {
