@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"gopherkv/data"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 )
@@ -155,13 +156,59 @@ func main() {
 // @author xuyang
 // @datetime 2025-6-24 7:00
 func showHelp() {
-	fmt.Println("GopherKV 目前支持的命令:")
-	fmt.Println("================================================")
+	// 构建帮助内容
+	var helpContent strings.Builder
+	helpContent.WriteString("GopherKV 命令参考手册\n")
+	helpContent.WriteString("===============================================\n\n")
+	helpContent.WriteString("GopherKV 是一个轻量级的键值型内存数据库，支持以下命令：\n\n")
+
 	for _, cmd := range Commands {
-		fmt.Printf("%-10s - %s\n", cmd.Name, cmd.Description)
-		fmt.Printf("  用法: %s\n", cmd.Usage)
-		fmt.Println()
+		helpContent.WriteString(fmt.Sprintf("命令: %s\n", cmd.Name))
+		helpContent.WriteString(fmt.Sprintf("描述: %s\n", cmd.Description))
+		helpContent.WriteString(fmt.Sprintf("用法: %s\n", cmd.Usage))
+		helpContent.WriteString("-----------------------------------------------\n")
 	}
+
+	helpContent.WriteString("\n示例:\n")
+	helpContent.WriteString("  set \"name\" \"张三\"     # 设置键值对\n")
+	helpContent.WriteString("  get \"name\"           # 获取值\n")
+	helpContent.WriteString("  keys                  # 查看所有键\n")
+	helpContent.WriteString("  kvs                   # 查看所有键值对\n")
+	helpContent.WriteString("  settime \"name\" 5000  # 设置5秒过期时间\n")
+	helpContent.WriteString("  getlasttime \"name\"   # 查看剩余生存时间\n\n")
+
+	helpContent.WriteString("更多信息请访问: https://github.com/xuyangpojo/gopher-kv\n")
+
+	// 尝试使用分页器显示
+	if err := showWithPager(helpContent.String()); err != nil {
+		// 如果分页器失败，回退到直接打印
+		fmt.Println(helpContent.String())
+	}
+}
+
+// showWithPager 使用分页器显示内容
+// @author xuyang
+// @datetime 2025-6-24 7:00
+// @param content string 要显示的内容
+// @return error 错误信息
+func showWithPager(content string) error {
+	// 尝试使用 less，如果不存在则使用 more
+	var cmd *exec.Cmd
+	if _, err := exec.LookPath("less"); err == nil {
+		cmd = exec.Command("less", "-R") // -R 支持ANSI颜色
+	} else if _, err := exec.LookPath("more"); err == nil {
+		cmd = exec.Command("more")
+	} else {
+		return fmt.Errorf("未找到分页器")
+	}
+
+	// 设置标准输入输出
+	cmd.Stdin = strings.NewReader(content)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	// 执行命令
+	return cmd.Run()
 }
 
 // showSimilarCommands 显示相似命令建议
