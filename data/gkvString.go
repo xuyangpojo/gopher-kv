@@ -38,7 +38,6 @@ func (gkvString *GkvString) Set(key string, value []byte) {
 // @datetime 2025-6-24 6:00
 func (gkvString *GkvString) Get(key string) (val []byte, ok bool) {
 	gkvString.keyLock.RLockRow(key)
-
 	// 检查是否过期
 	if expireTime, exists := gkvString.expireTimes[key]; exists {
 		if time.Now().After(expireTime) {
@@ -51,7 +50,6 @@ func (gkvString *GkvString) Get(key string) (val []byte, ok bool) {
 			return nil, false
 		}
 	}
-
 	val, ok = gkvString.data[key]
 	gkvString.keyLock.RUnLockRow(key)
 	return
@@ -81,17 +79,20 @@ func (gkvString *GkvString) GetAllKeys() []string {
 }
 
 // GetAllKVs 获取所有数据
-func (gkvString *GkvString) GetAllKVs() map[string][]byte {
+func (gkvString *GkvString) GetAllKVs() (result map[string]string) {
 	gkvString.keyLock.tableLock.Lock()
 	defer gkvString.keyLock.tableLock.Unlock()
-	return gkvString.data
+	result = make(map[string]string)
+	for s, bs := range gkvString.data {
+		result[s] = string(bs)
+	}
+	return
 }
 
 // SetTime 设置过期时间(毫秒为单位)
 func (gkvString *GkvString) SetTime(key string, timeMs int) {
 	gkvString.keyLock.WLockRow(key)
 	defer gkvString.keyLock.WUnLockRow(key)
-	// 检查键是否存在
 	if _, exists := gkvString.data[key]; exists {
 		expireTime := time.Now().Add(time.Duration(timeMs) * time.Millisecond)
 		gkvString.expireTimes[key] = expireTime
@@ -102,13 +103,9 @@ func (gkvString *GkvString) SetTime(key string, timeMs int) {
 func (gkvString *GkvString) SetNX(key string, value []byte) bool {
 	gkvString.keyLock.WLockRow(key)
 	defer gkvString.keyLock.WUnLockRow(key)
-
-	// 检查键是否已存在
 	if _, exists := gkvString.data[key]; exists {
 		return false
 	}
-
-	// 设置新值
 	gkvString.data[key] = value
 	delete(gkvString.expireTimes, key)
 	return true
@@ -118,13 +115,9 @@ func (gkvString *GkvString) SetNX(key string, value []byte) bool {
 func (gkvString *GkvString) SetXX(key string, value []byte) bool {
 	gkvString.keyLock.WLockRow(key)
 	defer gkvString.keyLock.WUnLockRow(key)
-
-	// 检查键是否存在
 	if _, exists := gkvString.data[key]; !exists {
 		return false
 	}
-
-	// 更新值
 	gkvString.data[key] = value
 	delete(gkvString.expireTimes, key)
 	return true
@@ -136,16 +129,13 @@ func (gkvString *GkvString) SetXX(key string, value []byte) bool {
 func (gkvString *GkvString) GetTTL(key string) int64 {
 	gkvString.keyLock.RLockRow(key)
 	defer gkvString.keyLock.RUnLockRow(key)
-	// 检查键是否存在
 	if _, exists := gkvString.data[key]; !exists {
 		return -1
 	}
-	// 检查是否有过期时间
 	expireTime, exists := gkvString.expireTimes[key]
 	if !exists {
 		return -1
 	}
-	// 计算剩余时间
 	remaining := time.Until(expireTime)
 	if remaining <= 0 {
 		return -2
