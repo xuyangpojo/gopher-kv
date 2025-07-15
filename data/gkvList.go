@@ -8,7 +8,7 @@ import (
 // @author xuyang
 // @datetime 2025-6-24 5:00
 type GkvList struct {
-	data        map[string][]byte
+	data        map[string][]string
 	expireTimes map[string]time.Time
 	keyLock     *KeyLock
 }
@@ -17,15 +17,15 @@ type GkvList struct {
 // @author xuyang
 // @datetime 2025-6-24 6:00
 var DataGkvList = &GkvList{
-	data:        make(map[string][]byte),
+	data:        make(map[string][]string),
 	expireTimes: make(map[string]time.Time),
 	keyLock:     NewKeyLock(),
 }
 
-// Set 设置值
+// LSet 设置值
 // @author xuyang
-// @datetime 2025-6-24 6:00
-func (GkvList *GkvList) Set(key string, value []byte) {
+// @datetime 2025-6-27 18:00
+func (GkvList *GkvList) LSet(key string, value []string) {
 	GkvList.keyLock.WLockRow(key)
 	defer GkvList.keyLock.WUnLockRow(key)
 	GkvList.data[key] = value
@@ -36,9 +36,8 @@ func (GkvList *GkvList) Set(key string, value []byte) {
 // Get 获取值
 // @author xuyang
 // @datetime 2025-6-24 6:00
-func (GkvList *GkvList) Get(key string) (val []byte, ok bool) {
+func (GkvList *GkvList) Get(key string) (val []string, ok bool) {
 	GkvList.keyLock.RLockRow(key)
-
 	// 检查是否过期
 	if expireTime, exists := GkvList.expireTimes[key]; exists {
 		if time.Now().After(expireTime) {
@@ -51,7 +50,6 @@ func (GkvList *GkvList) Get(key string) (val []byte, ok bool) {
 			return nil, false
 		}
 	}
-
 	val, ok = GkvList.data[key]
 	GkvList.keyLock.RUnLockRow(key)
 	return
@@ -80,15 +78,15 @@ func (GkvList *GkvList) GetAllKeys() []string {
 	return keys
 }
 
-// GetAllKVs 获取所有数据
-func (GkvList *GkvList) GetAllKVs() map[string][]byte {
+// LGetAllKVs 获取所有数据
+func (GkvList *GkvList) LGetAllKVs() map[string][]string {
 	GkvList.keyLock.tableLock.Lock()
 	defer GkvList.keyLock.tableLock.Unlock()
 	return GkvList.data
 }
 
-// SetTime 设置过期时间(毫秒为单位)
-func (GkvList *GkvList) SetTime(key string, timeMs int) {
+// LSetTime 设置过期时间(毫秒为单位)
+func (GkvList *GkvList) LSetTime(key string, timeMs int) {
 	GkvList.keyLock.WLockRow(key)
 	defer GkvList.keyLock.WUnLockRow(key)
 	// 检查键是否存在
@@ -98,16 +96,14 @@ func (GkvList *GkvList) SetTime(key string, timeMs int) {
 	}
 }
 
-// SetNX 仅当键不存在时才设置
-func (GkvList *GkvList) SetNX(key string, value []byte) bool {
+// LSetNX 仅当键不存在时才设置
+func (GkvList *GkvList) LSetNX(key string, value []string) bool {
 	GkvList.keyLock.WLockRow(key)
 	defer GkvList.keyLock.WUnLockRow(key)
-
 	// 检查键是否已存在
 	if _, exists := GkvList.data[key]; exists {
 		return false
 	}
-
 	// 设置新值
 	GkvList.data[key] = value
 	delete(GkvList.expireTimes, key)
@@ -115,15 +111,13 @@ func (GkvList *GkvList) SetNX(key string, value []byte) bool {
 }
 
 // SetXX 仅当键存在时才设置
-func (GkvList *GkvList) SetXX(key string, value []byte) bool {
+func (GkvList *GkvList) SetXX(key string, value []string) bool {
 	GkvList.keyLock.WLockRow(key)
 	defer GkvList.keyLock.WUnLockRow(key)
-
 	// 检查键是否存在
 	if _, exists := GkvList.data[key]; !exists {
 		return false
 	}
-
 	// 更新值
 	GkvList.data[key] = value
 	delete(GkvList.expireTimes, key)
