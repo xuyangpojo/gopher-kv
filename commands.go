@@ -276,3 +276,36 @@ func (h *InputHandler) moveCursor(direction int) {
 func (h *InputHandler) saveCurrentLine(line string) {
 	h.currentLine = line
 }
+
+// SaveHistoryToFile 将历史命令保存到文件
+func (h *InputHandler) SaveHistoryToFile(filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	for _, cmd := range h.history {
+		_, err := file.WriteString(cmd + "\n")
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// LoadAndExecHistoryFromFile 从文件加载命令并执行
+func LoadAndExecHistoryFromFile(filename string, execFunc func(string)) error {
+	file, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line != "" {
+			execFunc(line)
+		}
+	}
+	return scanner.Err()
+}

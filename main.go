@@ -5,9 +5,38 @@ import (
 	"gopherkv/data"
 	"strconv"
 	"strings"
+	"encoding/json"
+	"os"
 )
 
+// 配置结构体
+type Config struct {
+	Port     int    `json:"port"`
+	DataDir  string `json:"data_dir"`
+	LogLevel string `json:"log_level"`
+}
+
+func loadConfig(path string) (*Config, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	decoder := json.NewDecoder(file)
+	cfg := &Config{}
+	if err := decoder.Decode(cfg); err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
 func main() {
+	cfg, err := loadConfig("config.json")
+	if err != nil {
+		fmt.Printf("读取配置文件失败: %v\n", err)
+		return
+	}
+	fmt.Printf("配置文件加载成功: %+v\n", cfg)
 	inputHandler := NewInputHandler()
 	fmt.Println("-------------------------------------------------------")
 	fmt.Println("   _____             _                 _  ____      __")
