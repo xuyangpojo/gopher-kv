@@ -1,5 +1,8 @@
 # Gopher-KV 键值型内存数据库
-
+![status](https://img.shields.io/badge/status-active-brightgreen)
+![license](https://img.shields.io/badge/license-MIT-blue)
+![language](https://img.shields.io/badge/language-Go-00ADD8)
+![platform](https://img.shields.io/badge/platform-cross--platform-orange)
 ### 文件结构
 data/
 | 文件名                | 类别说明     | 类型    |
