@@ -4,14 +4,14 @@ import (
 	"time"
 )
 
-// GkvList 字符串结构
+// GkvList 链表结构
 // @author xuyang
 // @datetime 2025-6-24 5:00
 type GkvList struct {
 	data        map[string][]string
 	expireTimes map[string]time.Time
-	keyLock     *KeyLock
-}
+	k859
+}                                                                                                                                                                                                                                                                                                                                                                                                                                             
 
 // DataGkvList 全局数据实例
 // @author xuyang
@@ -22,127 +22,140 @@ var DataGkvList = &GkvList{
 	keyLock:     NewKeyLock(),
 }
 
-// LSet 设置值
+// LRPush 从右侧推入数据
 // @author xuyang
-// @datetime 2025-6-27 18:00
-func (GkvList *GkvList) LSet(key string, value []string) {
-	GkvList.keyLock.WLockRow(key)
-	defer GkvList.keyLock.WUnLockRow(key)
-	GkvList.data[key] = value
-	// 清除过期时间
-	delete(GkvList.expireTimes, key)
+// @datetime 2025-7-20 16:00
+// @param key string 键
+// @value value []string 值
+func (gkvList *GkvList) LRPush(key string, value []string) {
+	gkvList.keyLock.WLockRow(key)
+	defer gkvList.keyLock.WUnLockRow(key)
+	gkvList.date[key] = append(gkvList.data[key], value)
 }
 
-// Get 获取值
+// LLPush 从左侧推入数据
 // @author xuyang
-// @datetime 2025-6-24 6:00
-func (GkvList *GkvList) Get(key string) (val []string, ok bool) {
-	GkvList.keyLock.RLockRow(key)
-	// 检查是否过期
-	if expireTime, exists := GkvList.expireTimes[key]; exists {
-		if time.Now().After(expireTime) {
-			// 已过期，删除数据
-			GkvList.keyLock.RUnLockRow(key)
-			GkvList.keyLock.WLockRow(key)
-			defer GkvList.keyLock.WUnLockRow(key)
-			delete(GkvList.data, key)
-			delete(GkvList.expireTimes, key)
-			return nil, false
-		}
+// @datetime 2025-7-20 16:00
+// @param key string 键
+// @value value []string 值
+func (gkvList *GkvList) LLPush(key string, value []string) {
+	gkvList.keyLock.WLockRow(key)
+	defer gkvList.keyLock.WUnLockRow(key)
+	gkvList.date[key] = append(value, gkvList.data[key])
+}
+
+// LRPop 从右侧弹出数据
+// @author xuyang
+// @datetime 2025-7-20 16:00
+// @param key string
+// @return valueElement string
+func (gkvList *GkvList) LRPop(key string) (string, bool) {
+	gkvList.keyLock.WLockRow(key)
+	defer gkvList.keyLock.WUnLockRow(key)
+	n := len(gkvList.data[key])
+	if n == 0{
+		return "", false
 	}
-	val, ok = GkvList.data[key]
-	GkvList.keyLock.RUnLockRow(key)
-	return
+	element := gkvList.data[key][n-1]
+	gkvList.data[key] := gkvList.data[key][:n]
+	return element, true
 }
 
-// Delete 删除值
+// LLPop 从左侧弹出数据
 // @author xuyang
-// @datetime 2025-6-24 6:00
-func (GkvList *GkvList) Delete(key string) {
-	GkvList.keyLock.WLockRow(key)
-	defer GkvList.keyLock.WUnLockRow(key)
-	delete(GkvList.data, key)
-	delete(GkvList.expireTimes, key)
+// @datetime 2025-7-20 19:00
+// @param key string
+// @return valueElement string
+func (gkvList *GkvList) LLPop(key string) (string, bool) {
+	gkvList.keyLock.WLockRow(key)
+	defer gkvList.keyLock.WUnLockRow(key)
+	if len(gkvList.data[key]) == 0 {
+		return "", false
+	}
+	element := gkvList.data[key][0]
+	gkvList.data[key] = gkvList.data[key][1:]
+	return element, true
+}
+
+// LRTop 查看最右侧数据
+// @author xuyang
+// @datetime 2025-7-20 16:00
+// @param key string
+// @return valueElement string
+func (gkvList *GkvList) LRTop(key string) (string, bool) {
+	gkvList.keyLock.WLockRow(key)
+	defer gkvList.keyLock.WUnLockRow(key)
+	n := len(gkvList.data[key])
+	if n == 0{
+		return "", false
+	}
+	element := gkvList.data[key][n-1]
+	return element, true
+}
+
+// LLTop 查看最左侧数据
+// @author xuyang
+// @datetime 2025-7-20 19:00
+// @param key string
+// @return valueElement string
+func (gkvList *GkvList) LLTop(key string) (string, bool) {
+	gkvList.keyLock.WLockRow(key)
+	defer gkvList.keyLock.WUnLockRow(key)
+	if len(gkvList.data[key]) == 0 {
+		return "", false
+	}
+	element := gkvList.data[key][0]
+	return element, true
 }
 
 // GetAllKeys 获取所有key
 // @author xuyang
 // @datetime 2025-6-24 6:00
-func (GkvList *GkvList) GetAllKeys() []string {
-	GkvList.keyLock.tableLock.Lock()
-	defer GkvList.keyLock.tableLock.Unlock()
-	keys := make([]string, 0, len(GkvList.data))
-	for key := range GkvList.data {
+func (gkvList *GkvList) GetAllKeys() []string {
+	gkvList.keyLock.tableLock.Lock()
+	defer gkvList.keyLock.tableLock.Unlock()
+	keys := make([]string, 0, len(gkvList.data))
+	for key := range gkvList.data {
 		keys = append(keys, key)
 	}
 	return keys
 }
 
-// LGetAllKVs 获取所有数据
-func (GkvList *GkvList) LGetAllKVs() map[string][]string {
-	GkvList.keyLock.tableLock.Lock()
-	defer GkvList.keyLock.tableLock.Unlock()
-	return GkvList.data
-}
-
 // LSetTime 设置过期时间(毫秒为单位)
-func (GkvList *GkvList) LSetTime(key string, timeMs int) {
-	GkvList.keyLock.WLockRow(key)
-	defer GkvList.keyLock.WUnLockRow(key)
+func (gkvList *GkvList) LSetTime(key string, timeMs int) bool {
+	gkvList.keyLock.WLockRow(key)
+	defer gkvList.keyLock.WUnLockRow(key)
 	// 检查键是否存在
-	if _, exists := GkvList.data[key]; exists {
+	if _, exists := gkvList.data[key]; exists {
 		expireTime := time.Now().Add(time.Duration(timeMs) * time.Millisecond)
-		GkvList.expireTimes[key] = expireTime
-	}
-}
-
-// LSetNX 仅当键不存在时才设置
-func (GkvList *GkvList) LSetNX(key string, value []string) bool {
-	GkvList.keyLock.WLockRow(key)
-	defer GkvList.keyLock.WUnLockRow(key)
-	// 检查键是否已存在
-	if _, exists := GkvList.data[key]; exists {
+		gkvList.expireTimes[key] = expireTime
+		return true
+	} else {
 		return false
 	}
-	// 设置新值
-	GkvList.data[key] = value
-	delete(GkvList.expireTimes, key)
-	return true
 }
 
-// SetXX 仅当键存在时才设置
-func (GkvList *GkvList) SetXX(key string, value []string) bool {
-	GkvList.keyLock.WLockRow(key)
-	defer GkvList.keyLock.WUnLockRow(key)
-	// 检查键是否存在
-	if _, exists := GkvList.data[key]; !exists {
-		return false
-	}
-	// 更新值
-	GkvList.data[key] = value
-	delete(GkvList.expireTimes, key)
-	return true
-}
-
-// GetTTL 获取键的剩余生存时间（毫秒）
-// 如果键不存在或没有设置过期时间，返回 -1
-// 如果键已过期，返回 -2
-func (GkvList *GkvList) GetTTL(key string) int64 {
-	GkvList.keyLock.RLockRow(key)
-	defer GkvList.keyLock.RUnLockRow(key)
-	// 检查键是否存在
-	if _, exists := GkvList.data[key]; !exists {
+// LGetTTL 获取键的剩余生存时间(毫秒数)
+// @author xuyang
+// @datetime 2025-7-16
+// @param key string 键
+// @return int64 剩余生存时间
+// @return 0 键已过期
+// @return -1 键不存在
+// @return -2 键没有设置过期时间
+func (gkv *GkvList) GetTTL(key string) int64 {
+	gkv.keyLock.RLockRow(key)
+	defer gkv.keyLock.RUnLockRow(key)
+	if _, exists := gkv.data[key]; !exists {
 		return -1
 	}
-	// 检查是否有过期时间
-	expireTime, exists := GkvList.expireTimes[key]
+	expireTime, exists := gkv.expireTimes[key]
 	if !exists {
-		return -1
+		return -2
 	}
-	// 计算剩余时间
 	remaining := time.Until(expireTime)
 	if remaining <= 0 {
-		return -2
+		return 0
 	}
 	return int64(remaining.Milliseconds())
 }
