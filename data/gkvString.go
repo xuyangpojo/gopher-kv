@@ -163,13 +163,13 @@ func (gkvString *GkvString) SetXX(key string, value []byte) bool {
 // @return 0 键已过期
 // @return -1 键不存在
 // @return -2 键没有设置过期时间
-func (gkvString *GkvString) GetTTL(key string) int64 {
-	gkvString.keyLock.RLockRow(key)
-	defer gkvString.keyLock.RUnLockRow(key)
-	if _, exists := gkvString.data[key]; !exists {
+func (gkv *GkvString) GetTTL(key string) int64 {
+	gkv.keyLock.RLockRow(key)
+	defer gkv.keyLock.RUnLockRow(key)
+	if _, exists := gkv.data[key]; !exists {
 		return -1
 	}
-	expireTime, exists := gkvString.expireTimes[key]
+	expireTime, exists := gkv.expireTimes[key]
 	if !exists {
 		return -2
 	}

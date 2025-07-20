@@ -24,6 +24,8 @@ var DataGkvHyperLoglog = &GkvHyperLoglog{
 }
 
 // Add 添加元素
+// @author xuyang
+// @datetime 2025-7-20 23:00
 // @param key string
 // @param element string
 func (hll *GkvHyperLoglog) Add(key, element string) {
@@ -32,6 +34,7 @@ func (hll *GkvHyperLoglog) Add(key, element string) {
 	if _, exists := hll.data[key]; !exists {
 		hll.data[key] = make([]uint8, 1<<hll.precision)
 	}
+	// 哈希值计算
 	h := fnv.New64a()
 	h.Write([]byte(element))
 	hash := h.Sum64()
@@ -49,8 +52,10 @@ func (hll *GkvHyperLoglog) Add(key, element string) {
 }
 
 // Count 估算基数
-// @param key string
-// @return uint64
+// @author xuyang
+// @datetime 2025-7-20 23:00
+// @param key string 键
+// @return uint64 估算得到的基数(误差0.81%)
 func (hll *GkvHyperLoglog) Count(key string) uint64 {
 	hll.keyLock.RLockRow(key)
 	defer hll.keyLock.RUnLockRow(key)
@@ -69,8 +74,8 @@ func (hll *GkvHyperLoglog) Count(key string) uint64 {
 }
 
 // Merge 合并多个 HyperLogLog
-// @param dest string
-// @param srcs ...string
+// @param dest string 目标HLL
+// @param srcs ...string 要被合并的若干个HLL
 func (hll *GkvHyperLoglog) Merge(dest string, srcs ...string) {
 	hll.keyLock.WLockRow(dest)
 	if _, exists := hll.data[dest]; !exists && len(srcs) > 0 {
@@ -93,8 +98,13 @@ func (hll *GkvHyperLoglog) Merge(dest string, srcs ...string) {
 	hll.keyLock.WUnLockRow(dest)
 }
 
-// SetTime 设置过期时间(毫秒为单位)
-func (hll *GkvHyperLoglog) SetTime(key string, timeMs int) bool {
+// HSetTime 设置过期时间(毫秒为单位)
+// @author xuyang
+// @datetime 2025-7-20 23:00
+// @param key string 键
+// @param timeMs int 过期时间(毫秒数)
+// @return bool 是否设置成功
+func (hll *GkvHyperLoglog) HSetTime(key string, timeMs int) bool {
 	hll.keyLock.WLockRow(key)
 	defer hll.keyLock.WUnLockRow(key)
 	if _, exists := hll.data[key]; exists {
@@ -105,14 +115,21 @@ func (hll *GkvHyperLoglog) SetTime(key string, timeMs int) bool {
 	return false
 }
 
-// GetTTL 获取key的剩余生存时间(毫秒数)
-func (hll *GkvHyperLoglog) GetTTL(key string) int64 {
-	hll.keyLock.RLockRow(key)
-	defer hll.keyLock.RUnLockRow(key)
-	if _, exists := hll.data[key]; !exists {
+// HGetTTL 获取键的剩余生存时间(毫秒数)
+// @author xuyang
+// @datetime 2025-7-16
+// @param key string 键
+// @return int64 剩余生存时间
+// @return 0 键已过期
+// @return -1 键不存在
+// @return -2 键没有设置过期时间
+func (gkv *GkvHyperLoglog) HGetTTL(key string) int64 {
+	gkv.keyLock.RLockRow(key)
+	defer gkv.keyLock.RUnLockRow(key)
+	if _, exists := gkv.data[key]; !exists {
 		return -1
 	}
-	expireTime, exists := hll.expireTimes[key]
+	expireTime, exists := gkv.expireTimes[key]
 	if !exists {
 		return -2
 	}
