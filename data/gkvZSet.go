@@ -1,3 +1,5 @@
+package data
+
 import (
 	"time"
 	"sort"
@@ -146,4 +148,107 @@ func (gkvZSet *GkvZSet) GetTTL(key string) int64 {
 		return 0
 	}
 	return int64(remaining.Milliseconds())
+}
+
+// Rank 获取成员的排名（升序）
+// @param key string
+// @param member string
+// @return int 排名（0为第一名），-1为不存在
+func (gkvZSet *GkvZSet) Rank(key, member string) int {
+	gkvZSet.keyLock.RLockRow(key)
+	defer gkvZSet.keyLock.RUnLockRow(key)
+	members, exists := gkvZSet.data[key]
+	if !exists {
+		return -1
+	}
+	type kv struct {
+		member string
+		score  float64
+	}
+	arr := make([]kv, 0, len(members))
+	for m, s := range members {
+		arr = append(arr, kv{m, s})
+	}
+	sort.Slice(arr, func(i, j int) bool {
+		return arr[i].score < arr[j].score
+	})
+	for i, v := range arr {
+		if v.member == member {
+			return i
+		}
+	}
+	return -1
+}
+
+// RevRank 获取成员的倒序排名（分数高的排前面）
+// @param key string
+// @param member string
+// @return int 排名（0为第一名），-1为不存在
+func (gkvZSet *GkvZSet) RevRank(key, member string) int {
+	gkvZSet.keyLock.RLockRow(key)
+	defer gkvZSet.keyLock.RUnLockRow(key)
+	members, exists := gkvZSet.data[key]
+	if !exists {
+		return -1
+	}
+	type kv struct {
+		member string
+		score  float64
+	}
+	arr := make([]kv, 0, len(members))
+	for m, s := range members {
+		arr = append(arr, kv{m, s})
+	}
+	sort.Slice(arr, func(i, j int) bool {
+		return arr[i].score > arr[j].score
+	})
+	for i, v := range arr {
+		if v.member == member {
+			return i
+		}
+	}
+	return -1
+}
+
+// RemoveRangeByScore 删除分数区间的成员
+// @param key string
+// @param min, max float64
+func (gkvZSet *GkvZSet) RemoveRangeByScore(key string, min, max float64) {
+	gkvZSet.keyLock.WLockRow(key)
+	defer gkvZSet.keyLock.WUnLockRow(key)
+	members, exists := gkvZSet.data[key]
+	if !exists {
+		return
+	}
+	for m, s := range members {
+		if s >= min && s <= max {
+			delete(members, m)
+		}
+	}
+	if len(members) == 0 {
+		delete(gkvZSet.data, key)
+		delete(gkvZSet.expireTimes, key)
+	}
+}
+
+// Cardinality 获取有序集合成员数量
+// @param key string
+// @return int
+func (gkvZSet *GkvZSet) Cardinality(key string) int {
+	gkvZSet.keyLock.RLockRow(key)
+	defer gkvZSet.keyLock.RUnLockRow(key)
+	members, exists := gkvZSet.data[key]
+	if !exists {
+		return 0
+	}
+	return len(members)
+}
+
+// Clear 清空有序集合
+// @param key string
+func (gkvZSet *GkvZSet) Clear(key string) {
+	gkvZSet.keyLock.WLockRow(key)
+	defer gkvZSet.keyLock.WUnLockRow(key)
+	delete(gkvZSet.data, key)
+	delete(gkvZSet.expireTimes, key)
 }

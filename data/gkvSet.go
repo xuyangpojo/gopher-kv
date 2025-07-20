@@ -1,3 +1,5 @@
+package data
+
 import (
 	"time"
 )
@@ -129,4 +131,119 @@ func (gkvSet *GkvSet) GetTTL(key string) int64 {
 		return 0
 	}
 	return int64(remaining.Milliseconds())
+}
+
+// Inter 计算多个集合的交集
+// @param keys ...string
+// @return []string 交集成员
+func (gkvSet *GkvSet) Inter(keys ...string) []string {
+	if len(keys) == 0 {
+		return nil
+	}
+	gkvSet.keyLock.RLockRow(keys[0])
+	base, exists := gkvSet.data[keys[0]]
+	gkvSet.keyLock.RUnLockRow(keys[0])
+	if !exists {
+		return nil
+	}
+	result := make(map[string]struct{})
+	for m := range base {
+		result[m] = struct{}{}
+	}
+	for _, key := range keys[1:] {
+		gkvSet.keyLock.RLockRow(key)
+		members, exists := gkvSet.data[key]
+		gkvSet.keyLock.RUnLockRow(key)
+		if !exists {
+			return nil
+		}
+		for m := range result {
+			if _, ok := members[m]; !ok {
+				delete(result, m)
+			}
+		}
+	}
+	arr := make([]string, 0, len(result))
+	for m := range result {
+		arr = append(arr, m)
+	}
+	return arr
+}
+
+// Union 计算多个集合的并集
+// @param keys ...string
+// @return []string 并集成员
+func (gkvSet *GkvSet) Union(keys ...string) []string {
+	result := make(map[string]struct{})
+	for _, key := range keys {
+		gkvSet.keyLock.RLockRow(key)
+		members, exists := gkvSet.data[key]
+		gkvSet.keyLock.RUnLockRow(key)
+		if exists {
+			for m := range members {
+				result[m] = struct{}{}
+			}
+		}
+	}
+	arr := make([]string, 0, len(result))
+	for m := range result {
+		arr = append(arr, m)
+	}
+	return arr
+}
+
+// Diff 计算第一个集合与后续集合的差集
+// @param keys ...string
+// @return []string 差集成员
+func (gkvSet *GkvSet) Diff(keys ...string) []string {
+	if len(keys) == 0 {
+		return nil
+	}
+	gkvSet.keyLock.RLockRow(keys[0])
+	base, exists := gkvSet.data[keys[0]]
+	gkvSet.keyLock.RUnLockRow(keys[0])
+	if !exists {
+		return nil
+	}
+	result := make(map[string]struct{})
+	for m := range base {
+		result[m] = struct{}{}
+	}
+	for _, key := range keys[1:] {
+		gkvSet.keyLock.RLockRow(key)
+		members, exists := gkvSet.data[key]
+		gkvSet.keyLock.RUnLockRow(key)
+		if exists {
+			for m := range members {
+				delete(result, m)
+			}
+		}
+	}
+	arr := make([]string, 0, len(result))
+	for m := range result {
+		arr = append(arr, m)
+	}
+	return arr
+}
+
+// Cardinality 获取集合成员数量
+// @param key string
+// @return int
+func (gkvSet *GkvSet) Cardinality(key string) int {
+	gkvSet.keyLock.RLockRow(key)
+	defer gkvSet.keyLock.RUnLockRow(key)
+	members, exists := gkvSet.data[key]
+	if !exists {
+		return 0
+	}
+	return len(members)
+}
+
+// Clear 清空集合
+// @param key string
+func (gkvSet *GkvSet) Clear(key string) {
+	gkvSet.keyLock.WLockRow(key)
+	defer gkvSet.keyLock.WUnLockRow(key)
+	delete(gkvSet.data, key)
+	delete(gkvSet.expireTimes, key)
 }
